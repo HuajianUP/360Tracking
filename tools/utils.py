@@ -1,6 +1,140 @@
 import cv2
 import torch
 import numpy as np
+from scipy.ndimage import map_coordinates
+import matplotlib.pyplot as plt
+
+def warpImageFast(im, XXdense, YYdense):
+    minX = max(1., np.floor(XXdense.min()) - 1)
+    minY = max(1., np.floor(YYdense.min()) - 1)
+
+    maxX = min(im.shape[1], np.ceil(XXdense.max()) + 1)
+    maxY = min(im.shape[0], np.ceil(YYdense.max()) + 1)
+
+    im = im[int(round(minY-1)):int(round(maxY)),
+            int(round(minX-1)):int(round(maxX))]
+
+    assert XXdense.shape == YYdense.shape
+    out_shape = XXdense.shape
+    coordinates = [
+        (YYdense - minY).reshape(-1),
+        (XXdense - minX).reshape(-1),
+    ]
+    im_warp = np.stack([
+        map_coordinates(im[..., c], coordinates, order=1).reshape(out_shape)
+        for c in range(im.shape[-1])],
+        axis=-1)
+
+    return im_warp
+
+
+def uv2xyz(u, v, imgW, imgH):
+    lon, lat = uv2lonlat(u, v, imgW, imgH)
+    x = np.cos(lat) * np.sin(lon)
+    y = - np.sin(lat)
+    z = np.cos(lat) * np.cos(lon)
+
+    return x, y, z
+
+
+def uv2lonlat(u, v, imgW, imgH):
+    fx = imgW / (2 * np.pi)
+    cx = imgW / 2
+    fy = - imgH / np.pi
+    cy = imgH / 2
+
+    lon = (u - cx) / fx
+    lat = (v - cy) / fy
+
+    return lon, lat
+
+
+def imgLookAt(im, u, v, new_imgH, fov=None, region_size=None, out_mode='torch'):
+    sphereH = im.shape[0]
+    sphereW = im.shape[1]
+    CENTERx, CENTERy = uv2lonlat(u, v, sphereW, sphereH)
+    #print(sphereH, sphereW, CENTERy, CENTERx, new_imgH)
+
+    assert fov or region_size
+    if fov is None:
+        # calculate FOV according to size of sample region
+        context_umin = u - region_size / 2
+        context_umax = context_umin + region_size
+
+        if context_umin > sphereW:
+            context_umin -= sphereW
+        elif context_umin < 0:
+            context_umin += sphereW
+        if context_umax > sphereW:
+            context_umax -= sphereW
+        elif context_umax < 0:
+            context_umax += sphereW
+
+        # get the coordinate in 3D
+        x1, y1, z1 = uv2xyz(context_umin, v, sphereW, sphereH)
+        x2, y2, z2 = uv2xyz(context_umax, v, sphereW, sphereH)
+        fov = np.arccos(x1*x2+y1*y2+z1*z2)
+        #fov = max(np.arccos(x1*x2+y1*y2+z1*z2), np.pi/2)
+        #print(region_size, angle, fov)
+
+    warped_im = np.zeros((new_imgH, new_imgH, 3))
+    TX, TY = np.meshgrid(range(1, new_imgH + 1), range(1, new_imgH + 1))
+    TX = TX.reshape(-1, 1, order='F')
+    TY = TY.reshape(-1, 1, order='F')
+    TX = TX - 0.5 - new_imgH / 2
+    TY = TY - 0.5 - new_imgH / 2
+    r = new_imgH / 2 / np.tan(fov / 2)
+
+    # convert to 3D
+    R = np.sqrt(TY ** 2 + r ** 2)
+    ANGy = np.arctan(- TY / r)
+    ANGy = ANGy + CENTERy  # lat
+
+    X = np.sin(ANGy) * R
+    Y = -np.cos(ANGy) * R
+    Z = TX
+
+    INDn = np.nonzero(np.abs(ANGy) > np.pi / 2)
+
+    # project back to sphere
+    ANGx = np.arctan(Z / -Y)
+    RZY = np.sqrt(Z ** 2 + Y ** 2)
+    ANGy = np.arctan(X / RZY)
+
+    ANGx[INDn] = ANGx[INDn] + np.pi  # lon
+    ANGx = ANGx + CENTERx
+
+    INDy = np.nonzero(ANGy < -np.pi / 2)
+    ANGy[INDy] = -np.pi - ANGy[INDy]
+    ANGx[INDy] = ANGx[INDy] + np.pi
+
+    INDx = np.nonzero(ANGx <= -np.pi)
+    ANGx[INDx] = ANGx[INDx] + 2 * np.pi
+    INDx = np.nonzero(ANGx > np.pi)
+    ANGx[INDx] = ANGx[INDx] - 2 * np.pi
+    INDx = np.nonzero(ANGx > np.pi)
+    ANGx[INDx] = ANGx[INDx] - 2 * np.pi
+    INDx = np.nonzero(ANGx > np.pi)
+    ANGx[INDx] = ANGx[INDx] - 2 * np.pi
+
+    Px = (ANGx + np.pi) / (2 * np.pi) * sphereW + 0.5
+    Py = ((-ANGy) + np.pi / 2) / np.pi * sphereH + 0.5
+
+    INDxx = np.nonzero(Px < 1)
+    Px[INDxx] = Px[INDxx] + sphereW
+    im = np.concatenate([im, im[:, :2]], 1)
+
+    Px = Px.reshape(new_imgH, new_imgH, order='F')
+    Py = Py.reshape(new_imgH, new_imgH, order='F')
+
+    warped_im = warpImageFast(im, Px, Py)
+    #plt.imshow(warped_im)
+    #plt.show()
+    if out_mode == "torch":
+        return im_to_torch(warped_im.copy())
+    else:
+        return warped_im
+
 
 
 def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='torch'):
@@ -14,7 +148,7 @@ def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='
 
     sz = original_sz
     im_sz = im.shape
-    c = (original_sz+1) / 2
+    c = (original_sz + 1) / 2
     context_xmin = round(pos[0] - c)
     context_xmax = context_xmin + sz - 1
     context_ymin = round(pos[1] - c)
@@ -99,7 +233,7 @@ def remove_prefix(state_dict, prefix):
     return {f(key): value for key, value in state_dict.items()}
 
 
-def load_pretrain(model, pretrained_path, print_unuse=True, device = None):
+def load_pretrain(model, pretrained_path, print_unuse=True, device=None):
     print('load pretrained model from {}'.format(pretrained_path))
 
     device = torch.cuda.current_device() if device is None else device
@@ -110,7 +244,7 @@ def load_pretrain(model, pretrained_path, print_unuse=True, device = None):
         pretrained_dict = remove_prefix(pretrained_dict, 'feature_extractor.')  # remove online train
     else:
         pretrained_dict = remove_prefix(pretrained_dict, 'module.')  # remove multi-gpu label
-        pretrained_dict = remove_prefix(pretrained_dict, 'feature_extractor.')   # remove online train
+        pretrained_dict = remove_prefix(pretrained_dict, 'feature_extractor.')  # remove online train
 
     check_keys(model, pretrained_dict, print_unuse=print_unuse)
     model.load_state_dict(pretrained_dict, strict=False)
@@ -118,5 +252,5 @@ def load_pretrain(model, pretrained_path, print_unuse=True, device = None):
 
 
 def cxy_wh_2_rect(pos, sz):
-    return [float(max(float(0), pos[0]-sz[0]/2)), float(max(float(0), pos[1]-sz[1]/2)), float(sz[0]), float(sz[1])]  # 0-index
-
+    return [float(max(float(0), pos[0] - sz[0] / 2)), float(max(float(0), pos[1] - sz[1] / 2)), float(sz[0]),
+            float(sz[1])]  # 0-index

@@ -10,6 +10,7 @@ from tracker import get_tracker
 from utils import load_pretrain, cxy_wh_2_rect
 import models.models as models
 
+
 def parse_args():
     """
     args for testing.
@@ -34,7 +35,7 @@ def get_frames(video_name):
         # warmup
         for i in range(5):
             cap.read()
-        if not cap.isOpened(): 
+        if not cap.isOpened():
             print("Error opening video stream")
         while True:
             ret, frame = cap.read()
@@ -44,7 +45,7 @@ def get_frames(video_name):
                 break
     elif video_name.endswith('avi') or video_name.endswith('mp4'):
         cap = cv2.VideoCapture(video_name)
-        if not cap.isOpened(): 
+        if not cap.isOpened():
             print("Error opening video file")
         while True:
             ret, frame = cap.read()
@@ -58,7 +59,6 @@ def get_frames(video_name):
         for img in images:
             frame = cv2.imread(img)
             yield frame
-
 
 
 def tracking_video(tracker, net, video_name, args=None):
@@ -89,7 +89,7 @@ def tracking_video(tracker, net, video_name, args=None):
 
     display_name = 'Tracking: {}'.format(video_name)
     cv2.namedWindow(display_name, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
-    #cv2.resizeWindow(display_name, 960, 720)
+    # cv2.resizeWindow(display_name, 960, 720)
 
     count = 0
     SN = 0
@@ -98,19 +98,19 @@ def tracking_video(tracker, net, video_name, args=None):
     for frame in get_frames(args.video):
         frame_disp = frame.copy()
         if args.save_video_path and video_writer is None:
-            fourcc = cv2.VideoWriter_fourcc('M','J','P','G') #(*'XVID')
-            video_writer = cv2.VideoWriter(os.path.join(save_video_path, video_name+'.mp4'),
-                fourcc, 30.0, (frame.shape[1], frame.shape[0]))
-        
+            fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # (*'XVID')
+            video_writer = cv2.VideoWriter(os.path.join(save_video_path, video_name + '.mp4'),
+                                           fourcc, 30.0, (frame.shape[1], frame.shape[0]))
+
         if count < 0:
             cv2.putText(frame_disp, 'Tracking!', (10, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, font_color, 1)
             cv2.putText(frame_disp, 'Press r to reset', (10, 40), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, font_color, 1)
             cv2.putText(frame_disp, 'Press q to quit', (10, 60), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, font_color, 1)
             cv2.imshow(display_name, frame_disp)
             key = cv2.waitKey(100)
-            if key == ord('q'): 
+            if key == ord('q'):
                 break
-            elif key == ord('r'): 
+            elif key == ord('r'):
                 count = 0
                 continue
             else:
@@ -120,11 +120,11 @@ def tracking_video(tracker, net, video_name, args=None):
                 lx, ly, w, h = args.init_bbox
                 args.init_bbox = None
             else:
-                lx, ly, w, h = (0,0,0,0)
+                lx, ly, w, h = (0, 0, 0, 0)
                 while w == 0 or h == 0:
                     cv2.rectangle(frame_disp, (0, 0), (460, 30), (255, 255, 255), -1)
-                    cv2.putText(frame_disp, 'Select target ROI and press ENTER', (10, 20), 
-                            cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0, 255), 1)
+                    cv2.putText(frame_disp, 'Select target ROI and press ENTER', (10, 20),
+                                cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0, 255), 1)
                     try:
                         lx, ly, w, h = cv2.selectROI(display_name, frame_disp, fromCenter=False)
                     except:
@@ -138,7 +138,8 @@ def tracking_video(tracker, net, video_name, args=None):
             state = tracker.track(state, frame)
             location = cxy_wh_2_rect(state['target_pos'], state['target_sz'])
             regions.append(location)
-            x1, y1, x2, y2 = int(location[0]), int(location[1]), int(location[0] + location[2]), int(location[1] + location[3])
+            x1, y1, x2, y2 = int(location[0]), int(location[1]), int(location[0] + location[2]), int(
+                location[1] + location[3])
             cv2.rectangle(frame_disp, (x1, y1), (x2, y2), (0, 255, 0), 5)
             if args.save_video_path and video_writer:
                 video_writer.write(frame_disp)
@@ -156,9 +157,9 @@ def tracking_video(tracker, net, video_name, args=None):
             cv2.putText(frame_disp, 'Press q to quit', (10, 60), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, font_color, 1)
             cv2.imshow(display_name, frame_disp)
             key = cv2.waitKey(1)
-            if key == ord('q'): 
+            if key == ord('q'):
                 break
-            elif key == ord('r'): 
+            elif key == ord('r'):
                 count = 0
                 continue
             elif key == ord('e'):
@@ -167,7 +168,7 @@ def tracking_video(tracker, net, video_name, args=None):
         count += 1
         SN += 1
 
-    if args.save_results_path:   
+    if args.save_results_path:
         with open(result_txt_path, "w") as fin:
             for x in regions:
                 if isinstance(x, int):
@@ -175,10 +176,9 @@ def tracking_video(tracker, net, video_name, args=None):
                 else:
                     p_bbox = x.copy()
                     fin.write(','.join([str(i) for i in p_bbox]) + '\n')
-                    
+
     if args.save_video_path and video_writer:
         video_writer.release()
-
 
 
 def tracking_cam(tracker, net, video_name, args=None):
@@ -201,24 +201,24 @@ def tracking_cam(tracker, net, video_name, args=None):
     for frame in get_frames(args.video):
         frame_disp = frame.copy()
         if args.save_video_path and video_writer is None:
-            fourcc = cv2.VideoWriter_fourcc('M','J','P','G') #(*'XVID')
-            video_writer = cv2.VideoWriter(os.path.join(save_video_path, video_name+'.mp4'),
-                fourcc, 30.0, (frame.shape[1], frame.shape[0]))
-        
+            fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # (*'XVID')
+            video_writer = cv2.VideoWriter(os.path.join(save_video_path, video_name + '.mp4'),
+                                           fourcc, 30.0, (frame.shape[1], frame.shape[0]))
+
         font_color = (0, 0, 0)
         cv2.rectangle(frame_disp, (0, 0), (460, 70), (255, 255, 255), -1)
 
         key = cv2.waitKey(1)
-        if key == ord('q'): 
+        if key == ord('q'):
             break
-        elif key == ord('r'): 
+        elif key == ord('r'):
             init_frame = 0
         elif key == ord("e"):
             init_frame = -1
 
         if init_frame == 0:
-            cv2.putText(frame_disp, 'Select target ROI and press ENTER', (20, 30), 
-                    cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0, 255), 1)
+            cv2.putText(frame_disp, 'Select target ROI and press ENTER', (20, 30),
+                        cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0, 255), 1)
             try:
                 lx, ly, w, h = cv2.selectROI(display_name, frame_disp, fromCenter=False)
             except:
@@ -231,7 +231,8 @@ def tracking_cam(tracker, net, video_name, args=None):
         elif init_frame > 0:
             state = tracker.track(state, frame)
             location = cxy_wh_2_rect(state['target_pos'], state['target_sz'])
-            x1, y1, x2, y2 = int(location[0]), int(location[1]), int(location[0] + location[2]), int(location[1] + location[3])
+            x1, y1, x2, y2 = int(location[0]), int(location[1]), int(location[0] + location[2]), int(
+                location[1] + location[3])
             cv2.rectangle(frame_disp, (x1, y1), (x2, y2), (0, 255, 0), 5)
             if args.save_video_path and video_writer:
                 video_writer.write(frame_disp)
@@ -241,11 +242,11 @@ def tracking_cam(tracker, net, video_name, args=None):
 
             cv2.putText(frame_disp, 'Tracking!', (10, 20), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, font_color, 1)
             init_frame += 1
-        
-        cv2.putText(frame_disp, 'Press r to select a target', (10, 40), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, font_color, 1)
+
+        cv2.putText(frame_disp, 'Press r to select a target', (10, 40), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, font_color,
+                    1)
         cv2.putText(frame_disp, 'Press q to quit', (10, 60), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, font_color, 1)
         cv2.imshow(display_name, frame_disp)
-
 
 
 def main():
@@ -271,7 +272,6 @@ def main():
         video_name = 'webcam'
         tracking_cam(tracker, net, video_name, args)
 
-    
 
 if __name__ == '__main__':
     main()

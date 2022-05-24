@@ -3,8 +3,8 @@ import cv2
 import yaml
 import torch
 import numpy as np
-
-from utils import get_subwindow_tracking
+import matplotlib.pyplot as plt
+from utils import get_subwindow_tracking, imgLookAt
 
 
 def get_tracker(tracker, info):
@@ -163,8 +163,66 @@ class BaseTracker(object):
 class OmniTracker(BaseTracker):
     def init(self, im, target_pos, target_sz, model, hp=None):
         state = dict()
+        state['im_h'] = im.shape[0]
+        state['im_w'] = im.shape[1]
         p = LocalConfig()
+        self.grids(p)  # self.grid_to_search_x, self.grid_to_search_y
 
+        s_z = get_search_region_size(target_sz, p.context_amount)
+        # s_z = round(s_z)
+        #z_crop = imgLookAt(im, target_pos[0], target_pos[1], 100, fov=np.pi/2)
+        z_crop = imgLookAt(im, target_pos[0], target_pos[1], p.exemplar_size, region_size=s_z)
+        z = z_crop.unsqueeze(0)
+
+        net = model
+        net.template(z.cuda())
+
+        if p.windowing == 'cosine':
+            window = np.outer(np.hanning(p.score_size), np.hanning(p.score_size))  # [17,17]
+        elif p.windowing == 'uniform':
+            window = np.ones(int(p.score_size), int(p.score_size))
+
+        state['p'] = p
+        state['net'] = net
+        state['window'] = window
+        state['target_pos'] = target_pos
+        state['target_sz'] = target_sz
+        return state
+
+    def track(self, state, im, gt=None):
+        p = state['p']
+        net = state['net']
+        window = state['window']
+        target_pos = state['target_pos']
+        target_sz = state['target_sz']
+
+        s_z = get_search_region_size(target_sz, p.context_amount)
+        scale_z = p.exemplar_size / s_z
+        s_x = s_z * (p.instance_size / p.exemplar_size)
+
+        x_crop = imgLookAt(im, target_pos[0], target_pos[1], p.instance_size, region_size=s_x)
+        x_crop = x_crop.unsqueeze(0)
+
+        target_pos, target_sz, _ = self.update(net, x_crop.cuda(), target_pos, target_sz * scale_z, window, scale_z, p)
+
+        if target_pos[0] > state['im_w']:
+            target_pos[0] -= state['im_w']
+        elif target_pos[0] < 0:
+            target_pos[0] += state['im_w']
+        if target_pos[1] > state['im_h']:
+            target_pos[1] -= state['im_h']
+        elif target_pos[1] < 0:
+            target_pos[1] += state['im_h']
+
+        #target_pos[0] = max(0, min(state['im_w'], target_pos[0]))
+        #target_pos[1] = max(0, min(state['im_h'], target_pos[1]))
+        target_sz[0] = max(10, min(state['im_w'], target_sz[0]))
+        target_sz[1] = max(10, min(state['im_h'], target_sz[1]))
+        state['target_pos'] = target_pos
+        state['target_sz'] = target_sz
+        state['p'] = p
+
+        return state
 
 Tracker_dict = {"omni": OmniTracker, "base": BaseTracker}
 
