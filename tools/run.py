@@ -141,6 +141,28 @@ def tracking_video(tracker, net, video_name, args=None):
             x1, y1, x2, y2 = int(location[0]), int(location[1]), int(location[0] + location[2]), int(
                 location[1] + location[3])
             cv2.rectangle(frame_disp, (x1, y1), (x2, y2), (0, 255, 0), 5)
+            if args.tracker == "omni":
+                mcross = False
+                new_x1 = x1; new_x2 = x2; new_y1 = y1; new_y2 = y2
+                if x1 < 0:
+                    new_x1 += state['im_w']
+                    new_x2 += state['im_w']
+                    mcross = True
+                if y1 < 0:
+                    new_y1 += state['im_h']
+                    new_y2 += state['im_h']
+                    mcross = True
+                if x2 > state['im_w']:
+                    new_x2 -= state['im_w']
+                    new_x1 = -new_x2
+                    mcross = True
+                if y2 > state['im_h']:
+                    new_y2 -= state['im_h']
+                    new_y1 = -new_y2
+                    mcross = True
+                if mcross:
+                    cv2.rectangle(frame_disp, (new_x1, new_y1), (new_x2, new_y2), (0, 255, 0), 5)
+
             if args.save_video_path and video_writer:
                 video_writer.write(frame_disp)
             if args.save_image_path:

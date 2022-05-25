@@ -170,8 +170,14 @@ class OmniTracker(BaseTracker):
 
         s_z = get_search_region_size(target_sz, p.context_amount)
         # s_z = round(s_z)
-        #z_crop = imgLookAt(im, target_pos[0], target_pos[1], 100, fov=np.pi/2)
-        z_crop = imgLookAt(im, target_pos[0], target_pos[1], p.exemplar_size, region_size=s_z)
+        # z_crop = imgLookAt(im, target_pos[0], target_pos[1], 100, fov=np.pi/2)
+        # depend on the fov, if fov is larger than 90,
+        # then we should directly crop the image instead of rectifying
+        avg_chans = np.mean(im, axis=(0, 1))
+        if s_z > state['im_h'] * 0.8:
+            z_crop, _ = get_subwindow_tracking(im, target_pos, p.exemplar_size, s_z, avg_chans)
+        else:
+            z_crop = imgLookAt(im, target_pos[0], target_pos[1], p.exemplar_size, region_size=s_z)
         z = z_crop.unsqueeze(0)
 
         net = model
@@ -184,6 +190,7 @@ class OmniTracker(BaseTracker):
 
         state['p'] = p
         state['net'] = net
+        state['avg_chans'] = avg_chans
         state['window'] = window
         state['target_pos'] = target_pos
         state['target_sz'] = target_sz
@@ -193,6 +200,7 @@ class OmniTracker(BaseTracker):
         p = state['p']
         net = state['net']
         window = state['window']
+        avg_chans = state['avg_chans']
         target_pos = state['target_pos']
         target_sz = state['target_sz']
 
@@ -200,7 +208,10 @@ class OmniTracker(BaseTracker):
         scale_z = p.exemplar_size / s_z
         s_x = s_z * (p.instance_size / p.exemplar_size)
 
-        x_crop = imgLookAt(im, target_pos[0], target_pos[1], p.instance_size, region_size=s_x)
+        if s_x > state['im_h'] * 0.8:
+            x_crop, _ = get_subwindow_tracking(im, target_pos, p.instance_size, s_x, avg_chans)
+        else:
+            x_crop = imgLookAt(im, target_pos[0], target_pos[1], p.instance_size, region_size=s_x)
         x_crop = x_crop.unsqueeze(0)
 
         target_pos, target_sz, _ = self.update(net, x_crop.cuda(), target_pos, target_sz * scale_z, window, scale_z, p)
@@ -214,8 +225,6 @@ class OmniTracker(BaseTracker):
         elif target_pos[1] < 0:
             target_pos[1] += state['im_h']
 
-        #target_pos[0] = max(0, min(state['im_w'], target_pos[0]))
-        #target_pos[1] = max(0, min(state['im_h'], target_pos[1]))
         target_sz[0] = max(10, min(state['im_w'], target_sz[0]))
         target_sz[1] = max(10, min(state['im_h'], target_sz[1]))
         state['target_pos'] = target_pos

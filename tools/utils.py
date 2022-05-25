@@ -4,6 +4,7 @@ import numpy as np
 from scipy.ndimage import map_coordinates
 import matplotlib.pyplot as plt
 
+
 def warpImageFast(im, XXdense, YYdense):
     minX = max(1., np.floor(XXdense.min()) - 1)
     minY = max(1., np.floor(YYdense.min()) - 1)
@@ -11,8 +12,8 @@ def warpImageFast(im, XXdense, YYdense):
     maxX = min(im.shape[1], np.ceil(XXdense.max()) + 1)
     maxY = min(im.shape[0], np.ceil(YYdense.max()) + 1)
 
-    im = im[int(round(minY-1)):int(round(maxY)),
-            int(round(minX-1)):int(round(maxX))]
+    im = im[int(round(minY - 1)):int(round(maxY)),
+         int(round(minX - 1)):int(round(maxX))]
 
     assert XXdense.shape == YYdense.shape
     out_shape = XXdense.shape
@@ -53,7 +54,6 @@ def imgLookAt(im, u, v, new_imgH, fov=None, region_size=None, out_mode='torch'):
     sphereH = im.shape[0]
     sphereW = im.shape[1]
     CENTERx, CENTERy = uv2lonlat(u, v, sphereW, sphereH)
-    #print(sphereH, sphereW, CENTERy, CENTERx, new_imgH)
 
     assert fov or region_size
     if fov is None:
@@ -73,9 +73,8 @@ def imgLookAt(im, u, v, new_imgH, fov=None, region_size=None, out_mode='torch'):
         # get the coordinate in 3D
         x1, y1, z1 = uv2xyz(context_umin, v, sphereW, sphereH)
         x2, y2, z2 = uv2xyz(context_umax, v, sphereW, sphereH)
-        fov = np.arccos(x1*x2+y1*y2+z1*z2)
-        #fov = max(np.arccos(x1*x2+y1*y2+z1*z2), np.pi/2)
-        #print(region_size, angle, fov)
+        fov = np.arccos(x1 * x2 + y1 * y2 + z1 * z2)
+
 
     warped_im = np.zeros((new_imgH, new_imgH, 3))
     TX, TY = np.meshgrid(range(1, new_imgH + 1), range(1, new_imgH + 1))
@@ -128,13 +127,12 @@ def imgLookAt(im, u, v, new_imgH, fov=None, region_size=None, out_mode='torch'):
     Py = Py.reshape(new_imgH, new_imgH, order='F')
 
     warped_im = warpImageFast(im, Px, Py)
-    #plt.imshow(warped_im)
-    #plt.show()
+    # plt.imshow(warped_im)
+    # plt.show()
     if out_mode == "torch":
         return im_to_torch(warped_im.copy())
     else:
         return warped_im
-
 
 
 def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='torch'):
