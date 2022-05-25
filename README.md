@@ -1,5 +1,5 @@
 # 360Tracking
-A simple tool based on [SiamX](https://huajianup.github.io/research/SiamX/) for visual object tracking in 360 images (euqirectangular projection). SiamX is an efficient long-term tracker achieving state-of-the-art results and runs at higher speed. If you are interested in the tracker SiamX, you could read the [paper](https://huajianup.github.io/research/SiamX/SiamX_ICRA2022.pdf) and find more detail in our [project page](https://huajianup.github.io/research/SiamX/). In this repository, it only exploits the network architecture of SiamX while does not contain the code for training and dataset evaluation.
+A simple tool based on [SiamX](https://huajianup.github.io/research/SiamX/) for visual object tracking using normal or 360 images (euqirectangular projection). SiamX is an efficient long-term tracker achieving state-of-the-art results and runs at higher speed. If you are interested in the tracker SiamX, you could read the [paper](https://huajianup.github.io/research/SiamX/SiamX_ICRA2022.pdf) and find more detail in our [project page](https://huajianup.github.io/research/SiamX/). In this repository, it only exploits the network architecture of SiamX while does not contain the code for training and dataset evaluation.
 
 <img src="360tracking_demo.gif" alt="demo" width=2850>
 
@@ -20,9 +20,11 @@ Please download the SiamX model [here](https://hkustconnect-my.sharepoint.com/:u
 In root path `$360Tracking`,
 
 ```
-python tools/run.py --video YOUR_VIDEO_PATH --tracker omni --resume Your_Snapshot_Path(e.g., ./SiamX/snapshot/SiamX.pth)
+python tools/run.py --video YOUR_VIDEO_PATH --tracker omni --resume Your_Snapshot_Path
 ```
-If the video is composed of 360 images, you should select `--tracker omni` for better performance. The default `--tracker base` does not support cross-boundary tracking.
+e.g., python tools/run.py --video ./SiamX/demo.mp4 --tracker omni  ./SiamX/snapshot/SiamX.pth
+
+The default `--tracker base` does not support cross-boundary tracking. If the video is composed of 360 images, you should select `--tracker omni` for better performance. 
 
 You could also download and use [our data](https://hkustconnect-my.sharepoint.com/:v:/g/personal/hhuangbg_connect_ust_hk/EYsxaKkevn5IvnfwrrggQYIBsPdO0RVlJD3F0Ct0Ab6Ovw?e=8iScaB) for testing.
 
