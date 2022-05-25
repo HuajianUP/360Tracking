@@ -22,7 +22,7 @@ In root path `$360Tracking`,
 ```
 python tools/run.py --video YOUR_VIDEO_PATH --tracker omni --resume Your_Snapshot_Path
 ```
-e.g., python tools/run.py --video ./SiamX/demo.mp4 --tracker omni  ./SiamX/snapshot/SiamX.pth
+e.g., python tools/run.py --video ./SiamX/demo.mp4 --tracker omni  --resume ./SiamX/snapshot/SiamX.pth
 
 The default `--tracker base` does not support cross-boundary tracking. If the video is composed of 360 images, you should select `--tracker omni` for better performance. 
 
